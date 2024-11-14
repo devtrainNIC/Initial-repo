@@ -1,7 +1,6 @@
 ---
---comment
 layout: slide
-title: "Welcome to our slide deck!  change..."
+title: "Welcome to our slide deck!"
 ---
 
 Caption here
