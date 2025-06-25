@@ -1,5 +1,7 @@
 # Day 1: Getting Started with GitHub Flow
 
+> 🅿️ **Got Questions?** Use our [Parking Lot](../parking-lot-guide.md) to ask questions anytime during training!
+
 ### In Class Activities:
 - Work in the class repository together, a slide deck of images and captions.
 - Talk about [GitHub Flow](https://guides.github.com/introduction/flow/).

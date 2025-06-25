@@ -7,6 +7,7 @@
 
 - [GitHub for Developers Manual](https://githubtraining.github.io/training-manual/#/)
 - [Introduction to GitHub Flow](https://guides.github.com/introduction/flow/)
+- [🅿️ Parking Lot - Questions & Support Guide](docs/parking-lot-guide.md) - Your go-to resource for asking questions during training!
 
 ### 👇🔗 Click the dropdown menu below for the class URLs 🔗 👇
 

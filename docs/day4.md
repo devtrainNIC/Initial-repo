@@ -1,5 +1,7 @@
 # Day 4: Local Practice
 
+> 🅿️ **Got Questions?** Use our [Parking Lot](../parking-lot-guide.md) to ask questions anytime during training!
+
 ### In Class Activities:
 - Brand new, *local only* repositories
 - Advanced topics that have to do with Git under the hood

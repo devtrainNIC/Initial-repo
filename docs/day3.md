@@ -1,5 +1,7 @@
 # Day 3: `github-games`
 
+> 🅿️ **Got Questions?** Use our [Parking Lot](../parking-lot-guide.md) to ask questions anytime during training!
+
 ### In Class Activities:
 - Worked on another, third repository.
   - Just like the merge conflict repository, everyone has their own repository, and we will run scripts against it to track your progress. (Don't you love automation? :robot:)
