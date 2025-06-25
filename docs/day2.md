@@ -1,5 +1,7 @@
 # Day 2: Merge Conflicts
 
+> 🅿️ **Got Questions?** Use our [Parking Lot](../parking-lot-guide.md) to ask questions anytime during training!
+
 ### In Class Activities:
 
 #### Finish Workflow
