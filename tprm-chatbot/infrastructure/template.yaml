@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  TPRM Chatbot – AWS infrastructure.
+  Lambda (backend) + API Gateway (HTTP API) + S3 (static frontend).
+
+# ── Parameters ────────────────────────────────────────────────────────────────
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Description: Anthropic API key for Claude access
+
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      CORS allowed origin for API Gateway.
+      Set to your S3 website URL or CloudFront distribution in production
+      (e.g. https://d1abc123.cloudfront.net).
+
+# ── Globals ───────────────────────────────────────────────────────────────────
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 256
+    Environment:
+      Variables:
+        ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        ENVIRONMENT: !Ref Environment
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+Resources:
+
+  # ── Lambda function ──────────────────────────────────────────────────────────
+  TPRMChatbotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "tprm-chatbot-${Environment}"
+      CodeUri: ../backend/
+      Handler: lambda_function.lambda_handler
+      Description: TPRM chatbot handler – calls Claude API and returns answers
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ChatPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /chat
+            Method: POST
+        ChatOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /chat
+            Method: OPTIONS
+
+  # ── Lambda log group (with retention) ───────────────────────────────────────
+  TPRMChatbotLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/tprm-chatbot-${Environment}"
+      RetentionInDays: 30
+
+  # ── API Gateway HTTP API ─────────────────────────────────────────────────────
+  TPRMHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowHeaders:
+          - Content-Type
+          - X-Amz-Date
+          - Authorization
+          - X-Api-Key
+        AllowMethods:
+          - POST
+          - OPTIONS
+        MaxAge: 300
+
+  # ── S3 bucket for frontend ───────────────────────────────────────────────────
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "tprm-chatbot-frontend-${Environment}-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3600
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for the chat function
+    Value: !Sub "https://${TPRMHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat"
+    Export:
+      Name: !Sub "TPRMChatbotApiEndpoint-${Environment}"
+
+  FrontendBucketName:
+    Description: S3 bucket name for static frontend files
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub "TPRMChatbotFrontendBucket-${Environment}"
+
+  FrontendWebsiteURL:
+    Description: S3 static website URL
+    Value: !GetAtt FrontendBucket.WebsiteURL
+    Export:
+      Name: !Sub "TPRMChatbotFrontendURL-${Environment}"
+
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt TPRMChatbotFunction.Arn

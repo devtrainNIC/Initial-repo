@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TPRM Security Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>TPRM Assist</span>
+        </div>
+      </div>
+
+      <button class="new-chat-btn" id="newChatBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New conversation
+      </button>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Quick topics</span>
+        <ul class="topic-list">
+          <li><button class="topic-btn" data-prompt="What are the key components of a third-party risk management program?">TPRM Program Overview</button></li>
+          <li><button class="topic-btn" data-prompt="What questions should be in a vendor security questionnaire?">Security Questionnaire</button></li>
+          <li><button class="topic-btn" data-prompt="How do I tier or classify vendors by risk level?">Vendor Risk Tiering</button></li>
+          <li><button class="topic-btn" data-prompt="What are SOC 2 Type II requirements for vendors?">SOC 2 Requirements</button></li>
+          <li><button class="topic-btn" data-prompt="What should be included in a vendor contract security clause?">Contract Security Clauses</button></li>
+          <li><button class="topic-btn" data-prompt="How do I assess cloud vendor security (AWS/Azure/GCP)?">Cloud Vendor Assessment</button></li>
+          <li><button class="topic-btn" data-prompt="What are GDPR requirements for third-party data processors?">GDPR &amp; Data Processors</button></li>
+          <li><button class="topic-btn" data-prompt="How should vendors handle security incidents involving our data?">Incident Response</button></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="config-section">
+          <label for="apiEndpoint">API Endpoint</label>
+          <input type="text" id="apiEndpoint" placeholder="https://api.example.com/chat" />
+          <button id="saveConfig" class="save-btn">Save</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="chat-area">
+      <header class="chat-header">
+        <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <span class="chat-title">TPRM Security Assistant</span>
+        <span class="model-badge">claude-sonnet-4-6</span>
+      </header>
+
+      <div class="messages-container" id="messagesContainer">
+        <!-- Welcome state -->
+        <div class="welcome" id="welcomeState">
+          <div class="welcome-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <h1>TPRM Security Assistant</h1>
+          <p>Ask me anything about third-party risk management, vendor security assessments, compliance frameworks, and supply chain security.</p>
+          <div class="suggestion-grid">
+            <button class="suggestion-card" data-prompt="What is a standard vendor risk assessment process?">
+              <strong>Vendor Risk Assessment</strong>
+              <span>Standard process and checklist</span>
+            </button>
+            <button class="suggestion-card" data-prompt="What are the most critical security controls to verify in a vendor?">
+              <strong>Critical Security Controls</strong>
+              <span>Top controls to verify in vendors</span>
+            </button>
+            <button class="suggestion-card" data-prompt="How do I build a vendor inventory and classification system?">
+              <strong>Vendor Inventory</strong>
+              <span>Classification and tracking</span>
+            </button>
+            <button class="suggestion-card" data-prompt="What continuous monitoring should I do for high-risk vendors?">
+              <strong>Continuous Monitoring</strong>
+              <span>High-risk vendor oversight</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Messages will be inserted here -->
+        <div id="messagesList"></div>
+
+        <!-- Typing indicator -->
+        <div class="typing-indicator hidden" id="typingIndicator">
+          <div class="message assistant-message">
+            <div class="message-avatar assistant-avatar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <div class="typing-dots">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input area -->
+      <div class="input-area">
+        <div class="input-wrapper">
+          <textarea
+            id="userInput"
+            placeholder="Ask a TPRM or vendor security question..."
+            rows="1"
+            maxlength="4000"
+          ></textarea>
+          <button id="sendBtn" class="send-btn" disabled aria-label="Send message">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+        <p class="input-hint">Powered by Claude claude-sonnet-4-6 &mdash; Specialized in TPRM &amp; vendor security</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notification -->
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
