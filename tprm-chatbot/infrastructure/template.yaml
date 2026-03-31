@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  TPRM Chatbot – AWS infrastructure.
-  Lambda (backend) + API Gateway (HTTP API) + S3 (static frontend).
+  TPRM Chatbot – full stack.
+  Lambda (chat + upload + ingest) · API Gateway · S3 (docs + frontend) · Bedrock KB integration.
 
 # ── Parameters ────────────────────────────────────────────────────────────────
 Parameters:
@@ -10,20 +10,29 @@ Parameters:
     Type: String
     Default: prod
     AllowedValues: [dev, staging, prod]
-    Description: Deployment environment
 
   AnthropicApiKey:
     Type: String
     NoEcho: true
-    Description: Anthropic API key for Claude access
+    Description: Anthropic API key for Claude
 
   AllowedOrigin:
     Type: String
     Default: "*"
+    Description: CORS allowed origin (set to your CloudFront URL in production)
+
+  KnowledgeBaseId:
+    Type: String
+    Default: ""
     Description: >
-      CORS allowed origin for API Gateway.
-      Set to your S3 website URL or CloudFront distribution in production
-      (e.g. https://d1abc123.cloudfront.net).
+      Bedrock Knowledge Base ID – leave empty on first deploy.
+      Populate by running infrastructure/setup_knowledge_base.sh after first deploy,
+      then redeploy or run: aws lambda update-function-configuration ...
+
+  DataSourceId:
+    Type: String
+    Default: ""
+    Description: Bedrock Knowledge Base Data Source ID (set by setup_knowledge_base.sh)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
 Globals:
@@ -33,63 +42,57 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-        ANTHROPIC_API_KEY: !Ref AnthropicApiKey
-        ALLOWED_ORIGIN: !Ref AllowedOrigin
-        ENVIRONMENT: !Ref Environment
+        ALLOWED_ORIGIN:       !Ref AllowedOrigin
+        ENVIRONMENT:          !Ref Environment
+        KNOWLEDGE_BASE_ID:    !Ref KnowledgeBaseId
+        DATA_SOURCE_ID:       !Ref DataSourceId
+        DOCUMENTS_BUCKET:     !Sub "tprm-chatbot-docs-${Environment}-${AWS::AccountId}"
 
 # ── Resources ─────────────────────────────────────────────────────────────────
 Resources:
 
-  # ── Lambda function ──────────────────────────────────────────────────────────
-  TPRMChatbotFunction:
-    Type: AWS::Serverless::Function
+  # ════════════════════════════════════════════════════════
+  # S3 – Documents bucket (private, feeds Bedrock KB)
+  # ════════════════════════════════════════════════════════
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
     Properties:
-      FunctionName: !Sub "tprm-chatbot-${Environment}"
-      CodeUri: ../backend/
-      Handler: lambda_function.lambda_handler
-      Description: TPRM chatbot handler – calls Claude API and returns answers
-      Policies:
-        - AWSLambdaBasicExecutionRole
-      Events:
-        ChatPost:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref TPRMHttpApi
-            Path: /chat
-            Method: POST
-        ChatOptions:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref TPRMHttpApi
-            Path: /chat
-            Method: OPTIONS
-
-  # ── Lambda log group (with retention) ───────────────────────────────────────
-  TPRMChatbotLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/tprm-chatbot-${Environment}"
-      RetentionInDays: 30
-
-  # ── API Gateway HTTP API ─────────────────────────────────────────────────────
-  TPRMHttpApi:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      StageName: !Ref Environment
+      BucketName: !Sub "tprm-chatbot-docs-${Environment}-${AWS::AccountId}"
+      # Keep all previous versions so accidental deletes can be recovered
+      VersioningConfiguration:
+        Status: Enabled
+      # Bedrock KB needs access to this bucket
       CorsConfiguration:
-        AllowOrigins:
-          - !Ref AllowedOrigin
-        AllowHeaders:
-          - Content-Type
-          - X-Amz-Date
-          - Authorization
-          - X-Api-Key
-        AllowMethods:
-          - POST
-          - OPTIONS
-        MaxAge: 300
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins:
+              - !Ref AllowedOrigin
+            MaxAge: 3600
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: "s3:ObjectCreated:*"
+            Function: !GetAtt IngestFunction.Arn
+          - Event: "s3:ObjectRemoved:*"
+            Function: !GetAtt IngestFunction.Arn
 
-  # ── S3 bucket for frontend ───────────────────────────────────────────────────
+  # Allow S3 to invoke the ingest Lambda
+  IngestFunctionS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt IngestFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "arn:aws:s3:::tprm-chatbot-docs-${Environment}-${AWS::AccountId}"
+
+  # ════════════════════════════════════════════════════════
+  # S3 – Frontend bucket (public static website)
+  # ════════════════════════════════════════════════════════
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -120,26 +123,204 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub "${FrontendBucket.Arn}/*"
 
+  # ════════════════════════════════════════════════════════
+  # IAM – shared policy for Bedrock KB access
+  # ════════════════════════════════════════════════════════
+  BedrockKBPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "tprm-chatbot-bedrock-kb-${Environment}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:Retrieve
+              - bedrock-agent-runtime:Retrieve
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - bedrock-agent:StartIngestionJob
+              - bedrock-agent:GetIngestionJob
+              - bedrock-agent:ListIngestionJobs
+            Resource: "*"
+
+  # ════════════════════════════════════════════════════════
+  # Lambda – Chat function (RAG-enabled)
+  # ════════════════════════════════════════════════════════
+  TPRMChatbotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "tprm-chatbot-chat-${Environment}"
+      CodeUri: ../backend/
+      Handler: lambda_function.lambda_handler
+      Description: TPRM chatbot – retrieves context from Bedrock KB and answers via Claude
+      Timeout: 60
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - !Ref BedrockKBPolicy
+      Environment:
+        Variables:
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+      Events:
+        ChatPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /chat
+            Method: POST
+        ChatOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /chat
+            Method: OPTIONS
+
+  TPRMChatbotLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/tprm-chatbot-chat-${Environment}"
+      RetentionInDays: 30
+
+  # ════════════════════════════════════════════════════════
+  # Lambda – Document management (upload URL + list + delete)
+  # ════════════════════════════════════════════════════════
+  UploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "tprm-chatbot-upload-${Environment}"
+      CodeUri: ../backend/
+      Handler: upload_lambda.lambda_handler
+      Description: Generates presigned S3 upload URLs and lists/deletes documents
+      Timeout: 30
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+                - s3:ListBucket
+              Resource:
+                - !GetAtt DocumentsBucket.Arn
+                - !Sub "${DocumentsBucket.Arn}/*"
+      Events:
+        GetUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /upload-url
+            Method: GET
+        GetUploadUrlOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /upload-url
+            Method: OPTIONS
+        ListDocuments:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /documents
+            Method: GET
+        DeleteDocument:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /documents
+            Method: DELETE
+        DocumentsOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TPRMHttpApi
+            Path: /documents
+            Method: OPTIONS
+
+  UploadFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/tprm-chatbot-upload-${Environment}"
+      RetentionInDays: 30
+
+  # ════════════════════════════════════════════════════════
+  # Lambda – Bedrock KB ingestion trigger (S3 event)
+  # ════════════════════════════════════════════════════════
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "tprm-chatbot-ingest-${Environment}"
+      CodeUri: ../backend/
+      Handler: ingest_lambda.lambda_handler
+      Description: Triggers Bedrock KB re-indexing when documents are uploaded/deleted
+      Timeout: 30
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - !Ref BedrockKBPolicy
+
+  IngestFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/tprm-chatbot-ingest-${Environment}"
+      RetentionInDays: 30
+
+  # ════════════════════════════════════════════════════════
+  # API Gateway – HTTP API
+  # ════════════════════════════════════════════════════════
+  TPRMHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowHeaders:
+          - Content-Type
+          - X-Amz-Date
+          - Authorization
+          - X-Api-Key
+        AllowMethods:
+          - POST
+          - GET
+          - DELETE
+          - OPTIONS
+        MaxAge: 300
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
 Outputs:
-  ApiEndpoint:
-    Description: API Gateway endpoint URL for the chat function
+  ChatApiEndpoint:
+    Description: POST /chat – main chatbot endpoint
     Value: !Sub "https://${TPRMHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat"
     Export:
-      Name: !Sub "TPRMChatbotApiEndpoint-${Environment}"
+      Name: !Sub "TPRMChatApiEndpoint-${Environment}"
+
+  UploadApiEndpoint:
+    Description: GET /upload-url – presigned upload URL generator
+    Value: !Sub "https://${TPRMHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/upload-url"
+    Export:
+      Name: !Sub "TPRMUploadApiEndpoint-${Environment}"
+
+  DocumentsApiEndpoint:
+    Description: GET|DELETE /documents – document management
+    Value: !Sub "https://${TPRMHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/documents"
+    Export:
+      Name: !Sub "TPRMDocumentsApiEndpoint-${Environment}"
+
+  DocumentsBucketName:
+    Description: S3 bucket for uploaded documents (feeds Bedrock KB)
+    Value: !Ref DocumentsBucket
+    Export:
+      Name: !Sub "TPRMDocumentsBucket-${Environment}"
 
   FrontendBucketName:
-    Description: S3 bucket name for static frontend files
+    Description: S3 bucket for static frontend
     Value: !Ref FrontendBucket
     Export:
-      Name: !Sub "TPRMChatbotFrontendBucket-${Environment}"
+      Name: !Sub "TPRMFrontendBucket-${Environment}"
 
   FrontendWebsiteURL:
     Description: S3 static website URL
     Value: !GetAtt FrontendBucket.WebsiteURL
     Export:
-      Name: !Sub "TPRMChatbotFrontendURL-${Environment}"
-
-  LambdaFunctionArn:
-    Description: Lambda function ARN
-    Value: !GetAtt TPRMChatbotFunction.Arn
+      Name: !Sub "TPRMFrontendURL-${Environment}"

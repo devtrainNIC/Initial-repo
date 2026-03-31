@@ -8,131 +8,204 @@
 </head>
 <body>
   <div class="layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
+    <!-- ── Sidebar ──────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="logo">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
           <span>TPRM Assist</span>
         </div>
       </div>
 
-      <button class="new-chat-btn" id="newChatBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        New conversation
-      </button>
-
-      <div class="sidebar-section">
-        <span class="sidebar-label">Quick topics</span>
-        <ul class="topic-list">
-          <li><button class="topic-btn" data-prompt="What are the key components of a third-party risk management program?">TPRM Program Overview</button></li>
-          <li><button class="topic-btn" data-prompt="What questions should be in a vendor security questionnaire?">Security Questionnaire</button></li>
-          <li><button class="topic-btn" data-prompt="How do I tier or classify vendors by risk level?">Vendor Risk Tiering</button></li>
-          <li><button class="topic-btn" data-prompt="What are SOC 2 Type II requirements for vendors?">SOC 2 Requirements</button></li>
-          <li><button class="topic-btn" data-prompt="What should be included in a vendor contract security clause?">Contract Security Clauses</button></li>
-          <li><button class="topic-btn" data-prompt="How do I assess cloud vendor security (AWS/Azure/GCP)?">Cloud Vendor Assessment</button></li>
-          <li><button class="topic-btn" data-prompt="What are GDPR requirements for third-party data processors?">GDPR &amp; Data Processors</button></li>
-          <li><button class="topic-btn" data-prompt="How should vendors handle security incidents involving our data?">Incident Response</button></li>
-        </ul>
+      <!-- Tab switcher -->
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="chat" id="tabChat">Chat</button>
+        <button class="sidebar-tab" data-tab="docs" id="tabDocs">
+          Documents
+          <span class="doc-count-badge hidden" id="docCountBadge">0</span>
+        </button>
       </div>
 
+      <!-- ── Chat tab ─────────────────────────────────────────────── -->
+      <div class="tab-panel active" id="panelChat">
+        <button class="new-chat-btn" id="newChatBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          New conversation
+        </button>
+
+        <div class="sidebar-section">
+          <span class="sidebar-label">Quick topics</span>
+          <ul class="topic-list">
+            <li><button class="topic-btn" data-prompt="What are the key components of a third-party risk management program?">TPRM Program Overview</button></li>
+            <li><button class="topic-btn" data-prompt="What questions should be in a vendor security questionnaire?">Security Questionnaire</button></li>
+            <li><button class="topic-btn" data-prompt="How do I tier or classify vendors by risk level?">Vendor Risk Tiering</button></li>
+            <li><button class="topic-btn" data-prompt="What are SOC 2 Type II requirements for vendors?">SOC 2 Requirements</button></li>
+            <li><button class="topic-btn" data-prompt="What should be included in a vendor contract security clause?">Contract Security Clauses</button></li>
+            <li><button class="topic-btn" data-prompt="How do I assess cloud vendor security (AWS/Azure/GCP)?">Cloud Vendor Assessment</button></li>
+            <li><button class="topic-btn" data-prompt="What are GDPR requirements for third-party data processors?">GDPR &amp; Data Processors</button></li>
+            <li><button class="topic-btn" data-prompt="How should vendors handle security incidents involving our data?">Incident Response</button></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ── Documents tab ────────────────────────────────────────── -->
+      <div class="tab-panel" id="panelDocs">
+        <!-- Upload area -->
+        <div class="upload-section">
+          <span class="sidebar-label">Upload documents</span>
+          <div class="drop-zone" id="dropZone">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Drop files here<br/><span>or click to browse</span></p>
+            <input type="file" id="fileInput" multiple
+              accept=".pdf,.docx,.doc,.txt,.csv,.html,.htm,.md" />
+          </div>
+          <p class="upload-hint">PDF · DOCX · TXT · CSV · HTML · MD &nbsp;·&nbsp; Max 50 MB each</p>
+
+          <!-- Upload queue -->
+          <div class="upload-queue hidden" id="uploadQueue"></div>
+        </div>
+
+        <!-- Folder legend -->
+        <div class="folder-legend">
+          <span class="sidebar-label">Auto-categorisation</span>
+          <ul class="folder-list">
+            <li><span class="folder-chip soc2">soc2/</span> SOC 2 reports</li>
+            <li><span class="folder-chip vapt">vapt/</span> VAPT / pentest</li>
+            <li><span class="folder-chip policies">policies/</span> Policies</li>
+            <li><span class="folder-chip questionnaires">questionnaires/</span> Questionnaires</li>
+            <li><span class="folder-chip compliance">compliance/</span> ISO / NIST / GDPR</li>
+            <li><span class="folder-chip other">other/</span> Everything else</li>
+          </ul>
+        </div>
+
+        <!-- Document list -->
+        <div class="doc-list-section">
+          <div class="doc-list-header">
+            <span class="sidebar-label" style="margin-bottom:0">Uploaded documents</span>
+            <button class="icon-btn" id="refreshDocsBtn" title="Refresh">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+          <div class="doc-list" id="docList">
+            <p class="doc-empty">No documents yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Config (footer) ──────────────────────────────────────── -->
       <div class="sidebar-footer">
         <div class="config-section">
-          <label for="apiEndpoint">API Endpoint</label>
-          <input type="text" id="apiEndpoint" placeholder="https://api.example.com/chat" />
+          <label>API Base URL</label>
+          <input type="text" id="apiEndpoint" placeholder="https://xxx.execute-api.us-east-1.amazonaws.com/prod" />
           <button id="saveConfig" class="save-btn">Save</button>
         </div>
       </div>
     </aside>
 
-    <!-- Main chat area -->
+    <!-- ── Main chat area ───────────────────────────────────────────── -->
     <main class="chat-area">
       <header class="chat-header">
         <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
         <span class="chat-title">TPRM Security Assistant</span>
-        <span class="model-badge">claude-sonnet-4-6</span>
+        <div class="header-badges">
+          <span class="model-badge">claude-sonnet-4-6</span>
+          <span class="kb-badge hidden" id="kbBadge" title="Answering from your uploaded documents">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            Knowledge Base
+          </span>
+        </div>
       </header>
 
       <div class="messages-container" id="messagesContainer">
         <!-- Welcome state -->
         <div class="welcome" id="welcomeState">
           <div class="welcome-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
           </div>
           <h1>TPRM Security Assistant</h1>
-          <p>Ask me anything about third-party risk management, vendor security assessments, compliance frameworks, and supply chain security.</p>
+          <p>Ask questions about third-party risk management and vendor security. Upload your own SOC 2 reports, VAPT findings, policies, and past questionnaires — and I'll answer directly from your documents.</p>
+
           <div class="suggestion-grid">
             <button class="suggestion-card" data-prompt="What is a standard vendor risk assessment process?">
               <strong>Vendor Risk Assessment</strong>
-              <span>Standard process and checklist</span>
+              <span>Standard process &amp; checklist</span>
             </button>
             <button class="suggestion-card" data-prompt="What are the most critical security controls to verify in a vendor?">
               <strong>Critical Security Controls</strong>
-              <span>Top controls to verify in vendors</span>
+              <span>Top controls to verify</span>
             </button>
             <button class="suggestion-card" data-prompt="How do I build a vendor inventory and classification system?">
               <strong>Vendor Inventory</strong>
-              <span>Classification and tracking</span>
+              <span>Classification &amp; tracking</span>
             </button>
             <button class="suggestion-card" data-prompt="What continuous monitoring should I do for high-risk vendors?">
               <strong>Continuous Monitoring</strong>
               <span>High-risk vendor oversight</span>
             </button>
           </div>
+
+          <!-- KB status note -->
+          <div class="kb-status-note" id="kbStatusNote" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            <span id="kbStatusText">Knowledge base connected — answers will use your uploaded documents.</span>
+          </div>
         </div>
 
-        <!-- Messages will be inserted here -->
         <div id="messagesList"></div>
 
-        <!-- Typing indicator -->
         <div class="typing-indicator hidden" id="typingIndicator">
           <div class="message assistant-message">
             <div class="message-avatar assistant-avatar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
             </div>
-            <div class="typing-dots">
-              <span></span><span></span><span></span>
-            </div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
           </div>
         </div>
       </div>
 
-      <!-- Input area -->
       <div class="input-area">
         <div class="input-wrapper">
-          <textarea
-            id="userInput"
-            placeholder="Ask a TPRM or vendor security question..."
-            rows="1"
-            maxlength="4000"
-          ></textarea>
-          <button id="sendBtn" class="send-btn" disabled aria-label="Send message">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <textarea id="userInput" placeholder="Ask a TPRM or vendor security question..." rows="1" maxlength="4000"></textarea>
+          <button id="sendBtn" class="send-btn" disabled aria-label="Send">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
           </button>
         </div>
-        <p class="input-hint">Powered by Claude claude-sonnet-4-6 &mdash; Specialized in TPRM &amp; vendor security</p>
+        <p class="input-hint">Powered by Claude claude-sonnet-4-6 &amp; Amazon Bedrock Knowledge Base</p>
       </div>
     </main>
   </div>
 
-  <!-- Toast notification -->
   <div class="toast hidden" id="toast"></div>
-
   <script src="app.js"></script>
 </body>
 </html>
